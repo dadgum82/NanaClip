@@ -1,3 +1,6 @@
+# Secrets — NEVER commit these
+auth.json
+
 # Logs
 logs
 *.log
