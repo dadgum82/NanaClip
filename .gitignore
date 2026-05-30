@@ -1,6 +1,9 @@
 # Secrets — NEVER commit these
 auth.json
 
+# Claude Code local config (machine-specific)
+.claude/
+
 # Logs
 logs
 *.log

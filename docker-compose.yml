@@ -1,12 +1,7 @@
-version: "3.9"
-
 services:
   nanaclip:
-    image: nanaclip:latest
+    image: dadgum82/nanaclip:latest
     container_name: nanaclip
-    build:
-      context: .
-      dockerfile: Dockerfile
 
     volumes:
       # Unraid convention: appdata lives under /mnt/user/appdata/<container-name>

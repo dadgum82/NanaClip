@@ -31,9 +31,13 @@ Harris Teeter runs on Kroger's infrastructure and is protected by **Akamai Bot M
 
 ```
 NanaClip/
+├── .github/
+│   └── workflows/
+│       └── docker-publish.yml  # CI: builds + pushes to Docker Hub on every push to main
 ├── src/
-│   ├── clipper.js        # Weekly headless runner — lives inside Docker
-│   └── login.js          # One-time interactive login — run on your PC
+│   ├── clipper.js              # Weekly headless runner — lives inside Docker
+│   └── login.js                # One-time interactive login — run on your PC
+├── .dockerignore
 ├── Dockerfile
 ├── docker-compose.yml
 ├── package.json
@@ -80,25 +84,46 @@ Copy `auth.json` to your Unraid server as instructed. That file is Nana's "purse
 
 ## Setup — Step 2: Build and deploy on Unraid
 
-**Option A — docker-compose (recommended)**
+The image is published to **Docker Hub** at `dadgum82/nanaclip:latest`. Unraid pulls it directly — no build step needed on the server.
 
-Copy the repo to your Unraid server or build locally and push the image. Then:
+**Automatic builds via GitHub Actions (recommended)**
 
-```bash
-docker compose up --build -d
+Every push to `main` triggers `.github/workflows/docker-publish.yml`, which builds a `linux/amd64` image and pushes it to Docker Hub automatically.
+
+Before the first push, add two **Repository secrets** to your GitHub repo (Settings → Secrets and variables → Actions → Secrets tab → New repository secret):
+
+| Secret name | Value |
+|---|---|
+| `DOCKERHUB_USERNAME` | `dadgum82` |
+| `DOCKERHUB_TOKEN` | Docker Hub access token — [hub.docker.com](https://hub.docker.com) → Account Settings → Personal access tokens → Generate new token (Read, Write, Delete) |
+
+> The token is shown only once — copy it immediately before closing the dialog.
+
+**Manual push from Windows (Docker Desktop required)**
+
+```powershell
+docker build --platform linux/amd64 -t dadgum82/nanaclip:latest .
+docker push dadgum82/nanaclip:latest
 ```
 
-The container will run immediately, clip today's coupons, and stop.
+Run these from PowerShell (not WSL/bash) with [Docker Desktop](https://www.docker.com/products/docker-desktop/) running.
 
-**Option B — Unraid Docker UI**
+**Deploy on Unraid**
 
-1. Build the image on any machine with Docker: `docker build -t nanaclip .`
-2. Push to a local registry or transfer the image to Unraid.
-3. In the Unraid Docker UI, add a new container:
-   - **Repository:** `nanaclip:latest`
-   - **Extra Parameters:** `--shm-size=256m`
-   - **Volume:** `/mnt/user/appdata/nanaclip` → `/config`
-   - **Restart Policy:** `Never` (this is critical — see below)
+On Unraid, create the appdata folder and pull the image:
+
+```bash
+mkdir -p /mnt/user/appdata/nanaclip
+docker pull dadgum82/nanaclip:latest
+```
+
+Then add the container via the Unraid Docker UI:
+- **Repository:** `dadgum82/nanaclip:latest`
+- **Extra Parameters:** `--shm-size=256m`
+- **Volume:** `/mnt/user/appdata/nanaclip` → `/config`
+- **Restart Policy:** `Never` (this is critical — see below)
+
+Or use the included `docker-compose.yml` if you have the Compose Manager plugin installed.
 
 ---
 
@@ -111,10 +136,11 @@ Install the **User Scripts** plugin from Unraid Community Apps, then add a new s
 **Script:**
 ```bash
 #!/bin/bash
+docker pull dadgum82/nanaclip:latest
 docker start nanaclip
 ```
 
-Because `restart: "no"` is set in `docker-compose.yml`, the container exits cleanly after each run. `docker start` on a stopped container is safe to call week after week.
+The `docker pull` picks up any image updates automatically each week. Because `restart: "no"` is set in `docker-compose.yml`, the container exits cleanly after each run — `docker start` on a stopped container is safe to call week after week.
 
 ---
 
@@ -124,7 +150,7 @@ All variables have sensible defaults. Override them in `docker-compose.yml` or a
 
 | Variable | Default | Description |
 |---|---|---|
-| `HT_URL` | Harris Teeter coupons URL | Target page |
+| `HT_URL` | `https://www.harristeeter.com/savings/cl/coupons/` | Target page |
 | `CLIP_SELECTOR` | `button[data-testid="CouponCard-clip-button"]:not([disabled])` | CSS selector for unclipped coupon buttons |
 | `MAX_SCROLL_ITERATIONS` | `60` | Max scroll attempts before assuming all coupons are loaded |
 | `JITTER_MIN` | `250` | Minimum ms delay between clips |
@@ -191,7 +217,7 @@ Run the container pointing at a bot-detection test page to confirm the fingerpri
 docker run --rm --shm-size=256m \
   -e HT_URL=https://bot.sannysoft.com \
   -v /mnt/user/appdata/nanaclip:/config \
-  nanaclip
+  dadgum82/nanaclip:latest
 ```
 
 All checks on `bot.sannysoft.com` should return green.

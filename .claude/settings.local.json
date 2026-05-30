@@ -4,7 +4,9 @@
       "Bash(Get-ChildItem -Path \"C:\\\\GitHub\\\\NanaClip\" -Recurse)",
       "Bash(Select-Object FullName)",
       "Bash(Sort-Object FullName)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(npm info *)",
+      "Bash(npm install *)"
     ]
   }
 }
