@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  nanaclip:
+    image: nanaclip:latest
+    container_name: nanaclip
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    volumes:
+      # Unraid convention: appdata lives under /mnt/user/appdata/<container-name>
+      # auth.json must exist here before the first clip run.
+      - /mnt/user/appdata/nanaclip:/config
+
+    environment:
+      # Harris Teeter coupons page
+      - HT_URL=https://www.harristeeter.com/savings/cl/coupons/
+
+      # CSS selector for unclipped coupon buttons.
+      # Override here (no rebuild needed) if Harris Teeter updates their DOM.
+      - CLIP_SELECTOR=button[data-testid="CouponCard-clip-button"]:not([disabled])
+
+      # Scroll safety cap — 60 iterations covers 300+ coupons comfortably
+      - MAX_SCROLL_ITERATIONS=60
+
+      # Jitter range (ms) between individual coupon clips
+      - JITTER_MIN=250
+      - JITTER_MAX=600
+
+      # Set to "true" to discover and log coupons without actually clicking
+      - DRY_RUN=false
+
+      # Leave blank for unlimited clips; set to "1" for a smoke test
+      - MAX_CLIPS=
+
+    # CRITICAL for Unraid: container must exit so "docker start nanaclip"
+    # works cleanly the following week.  never use "unless-stopped" here.
+    restart: "no"
+
+    # Chromium needs at least 256 MB of /dev/shm or it will crash silently.
+    # Docker's default is 64 MB — this overrides it.
+    shm_size: "256m"
+
+    network_mode: bridge

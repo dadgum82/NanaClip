@@ -1,0 +1,19 @@
+{
+  "name": "nanaclip",
+  "version": "1.0.0",
+  "description": "Grandma's automated coupon clipper for Harris Teeter",
+  "main": "src/clipper.js",
+  "scripts": {
+    "clip": "node src/clipper.js",
+    "login": "node src/login.js",
+    "start": "node src/clipper.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "playwright": "^1.45.0",
+    "playwright-extra": "^0.3.10",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  }
+}
