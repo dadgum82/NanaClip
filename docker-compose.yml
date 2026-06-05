@@ -4,9 +4,9 @@ services:
     container_name: nanaclip
 
     volumes:
-      # Unraid convention: appdata lives under /mnt/user/appdata/<container-name>
-      # auth.json must exist here before the first clip run.
-      - /mnt/user/appdata/nanaclip:/config
+      # auth.json must exist in ./config before the first clip run.
+      # On Unraid: replace ./config with /mnt/user/appdata/nanaclip
+      - ./config:/config
 
     environment:
       # Harris Teeter coupons page

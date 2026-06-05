@@ -38,3 +38,10 @@ jobs:
             dadgum82/nanaclip:${{ github.sha }}
           cache-from: type=registry,ref=dadgum82/nanaclip:buildcache
           cache-to: type=registry,ref=dadgum82/nanaclip:buildcache,mode=max
+
+  deploy:
+    needs: build
+    runs-on: self-hosted
+    steps:
+      - name: Pull latest image
+        run: docker compose -f ~/docker/nanaclip/docker-compose.yml pull
