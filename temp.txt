@@ -1,0 +1,25 @@
+I'm running Claude Code on a dedicated Docker host VM and want to deploy NanaClip on it. Full environment context:
+
+HOST / INFRA
+- Proxmox VE 9.2 node at 192.168.0.125 (Ryzen 5700G, 32 GB RAM, 1 TB NVMe, Vega iGPU for host console).
+- This VM: Ubuntu Server 26.04 LTS (kernel 7.0), Proxmox VM 101, hostname `docker`, static IP 192.168.0.126, user `jesse` (sudo via password). 16 GB RAM / 4 vCPU.
+
+DOCKER
+- Docker CE 29.5.2 + Compose v5.1.4 (official apt repo). `jesse` is in the docker group (no sudo needed for docker).
+- Convention I want followed: compose-first. Each persistent service lives in ~/docker/<service>/compose.yaml, versioned in git. Named volumes, `restart: unless-stopped`. No raw `docker run` for anything long-lived.
+
+GPU AVAILABLE
+- NVIDIA RTX 3060 Ti (8 GB VRAM) passed through via VFIO. Driver 595.71.05 / CUDA 13.2.
+- NVIDIA Container Toolkit is installed and wired into Docker — containers get the GPU via `--gpus all` or the compose `deploy.resources.reservations.devices` block. Verified working (`docker run --rm --gpus all ubuntu nvidia-smi` returns the card).
+- 8 GB VRAM total, shared, nothing else using it yet.
+
+WHAT I'M DEPLOYING
+NanaClip: https://github.com/dadgum82/NanaClip
+- Needs the GPU? no
+- How should it be reachable? lan-only port
+- Persistent data it needs to keep? not yet just batch mode.
+
+HOW I WORK
+- Keep responses concise. Compose-first. I keep docs in Obsidian as markdown.
+
+First step: read NanaClip's README/repo to understand how it's meant to run, then propose the directory layout and a compose.yaml tailored to this host. Ask me anything you need before writing files.
