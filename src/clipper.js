@@ -187,8 +187,24 @@ async function main() {
   }
   nana('Loading your shopping passes... found them right in the purse!');
 
-  // Register stealth plugin (all 14 evasion modules active by default)
-  chromium.use(StealthPlugin());
+  // Register stealth plugin with a reduced evasion set.
+  //
+  // Harris Teeter's coupon page bundle (and Akamai's bot-manager sensor script)
+  // throws "RangeError: Maximum call stack size exceeded" when more than a
+  // handful of puppeteer-extra-plugin-stealth's evasions are active at once —
+  // the page never finishes rendering and the coupon grid stays stuck on
+  // "Loading" forever. The 'navigator.webdriver' evasion also triggers a CDP
+  // session crash ("Target page, context or browser has been closed") via
+  // playwright-extra's lazy CDP shim on this site. This set is the largest
+  // combination found that loads the page reliably. See README
+  // "Troubleshooting" for details and re-tuning notes.
+  chromium.use(StealthPlugin({
+    enabledEvasions: new Set([
+      'user-agent-override',
+      'sourceurl',
+      'defaultArgs',
+    ]),
+  }));
 
   const browser = await chromium.launch({
     headless: true,
@@ -222,6 +238,16 @@ async function main() {
   });
 
   const page = await context.newPage();
+
+  // Track the coupons API response — if Akamai blocks it (non-200), the page
+  // renders fine but shows "We're not finding any coupons right now", which
+  // looks identical to a real empty-circular week unless we check this.
+  let couponsApiStatus = null;
+  page.on('response', resp => {
+    if (resp.url().includes('/savings-coupons/v1/coupons')) {
+      couponsApiStatus = resp.status();
+    }
+  });
 
   try {
     nanaSection('Navigating to Harris Teeter');
@@ -259,7 +285,19 @@ async function main() {
 
     nanaSection('Browsing the Circular');
     nana("My, my! Let's see what savings are hiding in here...");
-    await scrollUntilStable(page);
+    const totalCoupons = await scrollUntilStable(page);
+
+    if (totalCoupons === 0) {
+      const blocked = couponsApiStatus !== null && couponsApiStatus !== 200;
+      const bodyText = await page.evaluate(() => document.body.innerText);
+      if (blocked || bodyText.includes("We're not finding any coupons")) {
+        nanaError(`Oh fiddlesticks — Harris Teeter's coupon counter waved me off (status ${couponsApiStatus ?? 'unknown'}).`);
+        nanaError("This looks like Akamai blocking the coupons request rather than an empty circular.");
+        nanaError('Try again later — if it keeps happening, the stealth evasion set may need re-tuning (see README).');
+        await browser.close();
+        process.exit(1);
+      }
+    }
 
     nanaSection('Clipping Coupons');
     nana('Starting to clip! This might take a little while, sweetheart...');
@@ -276,6 +314,13 @@ async function main() {
 
   process.exit(0);
 }
+
+// Stray async errors from playwright-extra's CDP shim (e.g. a session
+// outliving its page) shouldn't crash the whole run with a raw stack trace.
+process.on('unhandledRejection', err => {
+  nanaError(`Oh goodness, something went wrong in the background: ${err.message}`);
+  process.exit(1);
+});
 
 main().catch(err => {
   nanaError(`Oh goodness, something went wrong: ${err.message}`);

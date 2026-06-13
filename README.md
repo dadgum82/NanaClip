@@ -204,6 +204,33 @@ Harris Teeter may have updated their page layout. Try setting `DRY_RUN=true` and
 ```
 No Docker rebuild required — just restart the container.
 
+### "Harris Teeter's coupon counter waved me off" / "Found 0 coupons" every week
+This means Akamai (Harris Teeter's bot-detection layer) is blocking the coupons
+API call itself, even though the page loads normally.
+
+Some background: `clipper.js` uses only 4 of `puppeteer-extra-plugin-stealth`'s
+16 evasions (`user-agent-override`, `sourceurl`, `defaultArgs`,
+`navigator.webdriver`). This is deliberate — enabling any additional evasion
+(e.g. `navigator.plugins`, `navigator.languages`, `chrome.runtime`, etc.)
+causes Harris Teeter's page bundle and Akamai's sensor script to throw
+`RangeError: Maximum call stack size exceeded`, which leaves the coupon grid
+stuck on "Loading" forever (reporting "Found 0 coupons" every time).
+
+With only 4 evasions active, the page itself renders fine, but Akamai may
+still reject the `/atlas/v1/savings-coupons/...` request with a `403`. When
+that happens, Nana now exits with an error (exit code 1) instead of falsely
+reporting "Clipped 0 coupons. Got every last one!"
+
+If you see this:
+- It's usually transient — try again later (a fresh `auth.json` from
+  `node src/login.js` can also help, since it re-establishes a "real browser"
+  session that Akamai trusts more).
+- If it persists across multiple days, Akamai/Kroger likely changed their bot
+  detection again and the evasion set in `clipper.js` needs re-tuning. This is
+  a manual trial-and-error process: try adding back one evasion at a time from
+  `StealthPlugin().availableEvasions` and check whether (a) the page still
+  renders without the RangeError above, and (b) the coupons API returns `200`.
+
 ### Chromium crashes immediately with no output
 The container probably ran out of shared memory. Verify `shm_size: "256m"` is set in `docker-compose.yml` (Docker's default is only 64 MB, which Chromium cannot tolerate).
 
