@@ -30,11 +30,19 @@ const CHROME_UA =
 
 // ─── Logging ──────────────────────────────────────────────────────────────────
 function ts() {
-  return new Date().toLocaleTimeString('en-US', {
-    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-  });
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ` +
+         `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
-function nana(msg) { console.log(`[${ts()}] ${msg}`); }
+
+function nana(msg)      { console.log(`[${ts()}] [INFO ] ${msg}`); }
+function nanaWarn(msg)  { console.warn(`[${ts()}] [WARN ] ${msg}`); }
+function nanaError(msg) { console.error(`[${ts()}] [ERROR] ${msg}`); }
+function nanaSection(title) {
+  const bar = '─'.repeat(Math.max(0, 52 - title.length));
+  console.log(`\n[${ts()}] ── ${title} ${bar}`);
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 async function jitter(min = JITTER_MIN, max = JITTER_MAX) {
@@ -103,7 +111,7 @@ async function resolveSelector(page) {
 
 // ─── Clip every available coupon ──────────────────────────────────────────────
 async function clipAllCoupons(page) {
-  if (DRY_RUN) nana('(Dry-run mode — window shopping only, no actual clipping!)');
+  if (DRY_RUN) nanaWarn('(Dry-run mode — window shopping only, no actual clipping!)');
 
   const sel = await resolveSelector(page);
 
@@ -144,11 +152,11 @@ async function clipAllCoupons(page) {
         await jitter(300, 600);
       }
 
-      nana(`Well look at that, ${label}! Into the purse it goes.`);
+      nana(`  Well look at that, ${label}! Into the purse it goes.`);
       clipped++;
 
     } catch {
-      nana("Hmm, that one's being stubborn. Leaving it for next week.");
+      nanaWarn(`  Hmm, that one's being stubborn. Leaving it for next week.`);
       // Disable in-DOM so the selector skips it next iteration
       try { await btn.evaluate(el => { el.disabled = true; }); } catch { /* detached */ }
       skipped++;
@@ -160,12 +168,13 @@ async function clipAllCoupons(page) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
+  nanaSection('Starting Up');
   nana("Good morning, deary! Nana's putting on her reading glasses...");
 
   // Auth state
   if (!fs.existsSync(AUTH_FILE)) {
-    nana(`Oh dear, I can't find my shopping passes! Expected: ${AUTH_FILE}`);
-    nana('Run the login helper first:  node src/login.js');
+    nanaError(`Oh dear, I can't find my shopping passes! Expected: ${AUTH_FILE}`);
+    nanaError('Run the login helper first:  node src/login.js');
     process.exit(1);
   }
 
@@ -173,7 +182,7 @@ async function main() {
   try {
     storageState = JSON.parse(fs.readFileSync(AUTH_FILE, 'utf8'));
   } catch {
-    nana('My shopping passes got all crumpled — auth.json appears to be corrupt.');
+    nanaError('My shopping passes got all crumpled — auth.json appears to be corrupt.');
     process.exit(1);
   }
   nana('Loading your shopping passes... found them right in the purse!');
@@ -215,6 +224,7 @@ async function main() {
   const page = await context.newPage();
 
   try {
+    nanaSection('Navigating to Harris Teeter');
     nana("Heading over to Harris Teeter... hope the parking lot isn't too busy.");
     await page.goto(HT_URL, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
@@ -226,9 +236,9 @@ async function main() {
       url.includes('/auth/')   ||
       url.includes('account/login')
     ) {
-      nana('Oh my stars... my reading glasses must need updating, deary!');
-      nana("Looks like Harris Teeter sent me to the login page — my passes must have expired.");
-      nana('Run the login helper again to refresh them:  node src/login.js');
+      nanaError('Oh my stars... my reading glasses must need updating, deary!');
+      nanaError("Looks like Harris Teeter sent me to the login page — my passes must have expired.");
+      nanaError('Run the login helper again to refresh them:  node src/login.js');
       await browser.close();
       process.exit(1);
     }
@@ -241,18 +251,21 @@ async function main() {
       .locator('[data-testid*="coupon"], [class*="CouponCard"], [class*="coupon"]')
       .count();
     if (hasCoupons === 0) {
-      nana("Hmm, I can't seem to find the coupon shelf — the page layout may have changed.");
-      nana('Try adjusting the CLIP_SELECTOR env var, or wait for a script update.');
+      nanaError("Hmm, I can't seem to find the coupon shelf — the page layout may have changed.");
+      nanaError('Try adjusting the CLIP_SELECTOR env var, or wait for a script update.');
       await browser.close();
       process.exit(1);
     }
 
+    nanaSection('Browsing the Circular');
     nana("My, my! Let's see what savings are hiding in here...");
     await scrollUntilStable(page);
 
+    nanaSection('Clipping Coupons');
     nana('Starting to clip! This might take a little while, sweetheart...');
     const { clipped, skipped } = await clipAllCoupons(page);
 
+    nanaSection('Finished');
     const stubborn = skipped > 0 ? ` Left ${skipped} stubborn ones for next week.` : ' Got every last one!';
     nana(`All done, deary! Clipped ${clipped} coupons.${stubborn}`);
     nana("Nana's putting the scissors away. See you next Sunday!");
@@ -265,6 +278,6 @@ async function main() {
 }
 
 main().catch(err => {
-  nana(`Oh goodness, something went wrong: ${err.message}`);
+  nanaError(`Oh goodness, something went wrong: ${err.message}`);
   process.exit(1);
 });
